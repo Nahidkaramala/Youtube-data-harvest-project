@@ -151,8 +151,8 @@ connection = pymysql.connect(host= 'localhost',user = 'root',password = 'Nahid12
 cursor = connection.cursor()
 
 def channels_table():
-    # drop_query='''DROP TABLE IF EXISTS channels'''
-    # cursor.execute(drop_query)
+    drop_query='''DROP TABLE IF EXISTS channels'''
+    cursor.execute(drop_query)
     # connection.commit()
     create_query = '''CREATE TABLE IF NOT EXISTS channels (Channel_Name VARCHAR(100),
                                                             Channel_Id VARCHAR(100) PRIMARY KEY,
@@ -201,8 +201,8 @@ def channels_table():
 
 def videos_table():
     try:
-        # drop_query='''DROP TABLE IF EXISTS videos'''
-        # cursor.execute(drop_query)
+        drop_query='''DROP TABLE IF EXISTS videos'''
+        cursor.execute(drop_query)
         cursor.execute('''CREATE TABLE IF NOT EXISTS videos(
                                                             Channel_Name VARCHAR(500),
                                                             Channel_Id VARCHAR(50),
@@ -251,8 +251,8 @@ def videos_table():
 videos_table()
 
 def comments_table():
-    # drop_query='''DROP TABLE IF EXISTS comments'''
-    # cursor.execute(drop_query)
+    drop_query='''DROP TABLE IF EXISTS comments'''
+    cursor.execute(drop_query)
     
     create_query = '''CREATE TABLE IF NOT EXISTS comments(Comment_Id varchar(100) primary key,
                                                                   video_id VARCHAR(50),
@@ -295,10 +295,10 @@ def comments_table():
 
 
 def tables():
-    channels_table()
-    videos_table()
-    comments_table()
-    return 'Tables created successfully'
+   data={'Channel': channels_table(),
+        'Video': videos_table(),
+        'Comments':comments_table()}
+   return data
 
 
 st.title(':green[WELCOME TO STREAMLIT]')
@@ -307,13 +307,14 @@ st.caption(':blue[Data fetching Using Python, API key]')
 st.caption(':blue[Data integration using MongoDB & Mysql]')
 st.sidebar.title(":green[GUVI]")
 st.sidebar.title(":red[Created by NAHID]")
-st.sidebar.select_slider("Rate your experience",["Bad","Average","Good","Outstanding"])
+st.sidebar.select_slider("Rate your experience",["Outstanding","Good","Average","Bad"])
 st.info("Fetch Youtube channels data")
 
 channel_id = st.text_input("Enter the channel ID")
 channels = channel_id.split(',')
 channels = [ch.strip() for ch in channels if ch]
 input_channel_id = channel_id
+
 input_channel_id = []
 
 if st.button('show channel data'):
@@ -329,159 +330,167 @@ if st.button('Migrate to MongoDB'):
         newdb = client['Youtube_data_harvest']
         newcol=newdb['channel_data']
         for ch_data in newcol.find({}, {'_id': 0, 'Channel Data': 1}):
-                display=cd.append(ch_data['Channel Data']['Channel_Id'])
+            display=cd.append(ch_data['Channel Data']['Channel_Id'])
+            st.write(display)
+    
         if channel_id in cd:
             st.success('Channel Details of the Given ID Already Exists') 
-            st.write(display) 
+            # st.write(display)
         for ch_data in newcol.find({'Channel Data.Channel_Id': channel_id}, {'_id': 0, 'Channel Data': 1}):
-            st.write('Channel Data:', ch_data['Channel Data'])
-                
-        for vid_d in newcol.find({'Channel Data.Channel_Id': channel_id}, {'_id': 0, 'Channel Data': 1, 'Video Data': 1}):
+            st.write('Channel Data:', ch_data.get('Channel Data')) 
+        # for ch_data in newcol.find({'Channel Data.Channel_Id': channel_id}, {'_id': 0, 'Channel Data': 1}):
+        #     st.write('Channel Data:', ch_data['Channel Data'])
+        for vid_d in newcol.find({'Channel Data.Channel_Id': channel_id}, {'_id': 0, 'Video Data.Video_Id': 1}):
             if 'Video Data' in vid_d:
                 st.write('Video Data:', vid_d['Video Data'])
+
+            # video_ids = vid_d.get('Video Data', {})('Video_Id', [])
+            # st.write('Video IDs:', video_ids)
+                
+        # for vid_d in newcol.find({'Channel Data.Channel_Id': channel_id}, {'_id': 0, 'Channel Data': 1, 'Video Data': 1}):
+        #     if 'Video Data' in vid_d:
+        #         st.write('Video Data:', vid_d['Video Data'])
                     
         else:
             insert = data_harvest(channel_id)
             st.success(insert)
-            st.write("Channel details successfully updated in MongoDB")     
-    st.success(insert)
+            st.write("Channel details successfully updated in MongoDB")  
             
  
 
 if st.button('Migrate to Sql') and input_channel_id !="":
-    if channel_id in channels:
-        st.write("Channel data tables already exists!!!")
-         
-    else:
-        st.success(tables())
-        st.write("Channel data successfully updated to Mysql")
+    connection = pymysql.connect(host= 'localhost',user = 'root',password = 'Nahid123',database = 'Youtube_data_harvest')
+    cursor = connection.cursor()
+    display=tables()
+    st.write(display)
+    st.write("Channel data successfully updated to Mysql")
 
 
-    show = st.radio('SELECT THE TABLE to VIEW', ('channels', 'videos', 'comments'))
+show = st.selectbox('SELECT THE TABLE to VIEW', ('channels', 'videos', 'comments'))
 
-    def show_channel_tab():
-            channels_list=[]
-            newdb=client["Youtube_data_harvest"]
-            newcol=newdb['channel_data']
-            for chdata in newcol.find({},{"_id":0,"Channel Data":1}):
-                channels_list.append(chdata["Channel Data"])
-            channel_tab=pd.DataFrame(channels_list)
-            return channel_tab
-
-                
-    def show_video_tab():
-        videos_list=[]
+def show_channel_tab():
+        channels_list=[]
         newdb=client["Youtube_data_harvest"]
         newcol=newdb['channel_data']
-        for vidata in newcol.find({},{'_id':0,'Video Data':1}):
-            for i in range(len(vidata['Video Data'])):
-                videos_list.append(vidata['Video Data'][i])
-        video_tab=pd.DataFrame(videos_list)
-        return video_tab
+        for chdata in newcol.find({},{"_id":0,"Channel Data":1}):
+            channels_list.append(chdata["Channel Data"])
+        channel_tab=pd.DataFrame(channels_list)
+        return channel_tab
+
+            
+def show_video_tab():
+    videos_list=[]
+    newdb=client["Youtube_data_harvest"]
+    newcol=newdb['channel_data']
+    for vidata in newcol.find({},{'_id':0,'Video Data':1}):
+        for i in range(len(vidata['Video Data'])):
+            videos_list.append(vidata['Video Data'][i])
+    video_tab=pd.DataFrame(videos_list)
+    return video_tab
 
 
-    def show_comnt_tab():
-        comment_list = []
-        newdb=client["Youtube_data_harvest"]
-        newcol=newdb['channel_data']
-        for com_data in newcol.find({}, {'_id': 0, 'Comment_Data': 1}):
-            for i in range(len(com_data['Comment_Data'])):
-                comment_list.append(com_data['Comment_Data'][i])
-        comnt_tab = pd.DataFrame(comment_list)
-        return comnt_tab
+def show_comnt_tab():
+    comment_list = []
+    newdb=client["Youtube_data_harvest"]
+    newcol=newdb['channel_data']
+    for com_data in newcol.find({}, {'_id': 0, 'Comment_Data': 1}):
+        for i in range(len(com_data['Comment_Data'])):
+            comment_list.append(com_data['Comment_Data'][i])
+    comnt_tab = pd.DataFrame(comment_list)
+    return comnt_tab
 
-    if show == "channels":
-        Display = st.write(show_channel_tab())
-        st.balloons()
-        
-    elif show == "videos":
-        Display = st.write(show_video_tab())
-        st.balloons()
-        
-    elif show == "comments":
-        Display = st.write(show_comnt_tab())
-        st.balloons()
+if show == "channels":
+    Display = st.write(show_channel_tab())
+  
     
-    question = st.selectbox('Select your question', ('1.Display the channel names',
-                                                    '2.Channels with highest Subscribers',
-                                                    '3.Top 10 most viewed videos',
-                                                    '4.10 Videos with highest comments',
-                                                    '5.Top 10 Videos with highest likes',
-                                                    '6.channel name of highest liked video',
-                                                    '7.Names of all the videos and their corresponding channels',
-                                                    '8.Videos with likes and their corresponding channel names',
-                                                    '9.Average duration of all videos in each channel',
-                                                    '10.Number of views of each channel'
-                                                    ))
+elif show == "videos":
+    Display = st.write(show_video_tab())
+ 
+    
+elif show == "comments":
+    Display = st.write(show_comnt_tab())
+   
+    
+question = st.selectbox('Select your question', ('1.Display the channel names',
+                                                '2.Channels with highest Subscribers',
+                                                '3.Top 10 most viewed videos',
+                                                '4.10 Videos with highest comments',
+                                                '5.Top 10 Videos with highest likes',
+                                                '6.channel name of highest liked video',
+                                                '7.Names of all the videos and their corresponding channels',
+                                                '8.Videos with likes and their corresponding channel names',
+                                                '9.Average duration of all videos in each channel',
+                                                '10.Number of views of each channel'
+                                                ))
 
 
-    if question == '1.Display the channel names':
-        query1 = '''select Channel_Name from channels;'''
-        cursor.execute(query1)
-        t1=cursor.fetchall()
-        st.write(pd.DataFrame(t1, columns=["Channel_Name"]))
+if question == '1.Display the channel names':
+    query1 = '''select Channel_Name from channels;'''
+    cursor.execute(query1)
+    t1=cursor.fetchall()
+    st.write(pd.DataFrame(t1, columns=["Channel_Name"]))
 
-    elif question == '2.Channels with highest Subscribers':
-        query2 = '''select Channel_Name,Subscription_Count from channels order by Subscription_Count;'''
-        cursor.execute(query2)
-        t2=cursor.fetchall()
-        st.write(pd.DataFrame(t2, columns=["Channel_Name","Subscription_Count"]))
+elif question == '2.Channels with highest Subscribers':
+    query2 = '''select Channel_Name,Subscription_Count from channels order by Subscription_Count;'''
+    cursor.execute(query2)
+    t2=cursor.fetchall()
+    st.write(pd.DataFrame(t2, columns=["Channel_Name","Subscription_Count"]))
 
-    elif question == '3.Top 10 most viewed videos':
-        query3 = '''select view_count,Channel_Name,video_title from videos where view_count is not null order by view_count desc 
-        limit 10;'''
-        cursor.execute(query3)
-        t3=cursor.fetchall()
-        st.write(pd.DataFrame(t3, columns=["Channel_Name","video_title","view_count"]))
+elif question == '3.Top 10 most viewed videos':
+    query3 = '''select view_count,Channel_Name,video_title from videos where view_count is not null order by view_count desc 
+    limit 10;'''
+    cursor.execute(query3)
+    t3=cursor.fetchall()
+    st.write(pd.DataFrame(t3, columns=["Channel_Name","video_title","view_count"]))
 
-    elif question == '4.10 Videos with highest comments':
-        query4 = '''select comment_count, video_title from videos where comment_count is not null order by comment_count desc
-        limit 10;'''
-        cursor.execute(query4)
-        t4=cursor.fetchall()
-        st.write(pd.DataFrame(t4, columns=["video_title","comment_count"]))
+elif question == '4.10 Videos with highest comments':
+    query4 = '''select comment_count, video_title from videos where comment_count is not null order by comment_count desc
+    limit 10;'''
+    cursor.execute(query4)
+    t4=cursor.fetchall()
+    st.write(pd.DataFrame(t4, columns=["video_title","comment_count"]))
 
-    elif question == '5.Top 10 Videos with highest likes':
-        query5 = '''select Channel_Name, video_title,like_count from videos where like_count is not null order by like_count 
-        desc limit 10;'''
-        cursor.execute(query5)
-        t5=cursor.fetchall()
-        st.write(pd.DataFrame(t5, columns=["Channel_Name","video_title","like_count"]))
+elif question == '5.Top 10 Videos with highest likes':
+    query5 = '''select Channel_Name, video_title,like_count from videos where like_count is not null order by like_count 
+    desc limit 10;'''
+    cursor.execute(query5)
+    t5=cursor.fetchall()
+    st.write(pd.DataFrame(t5, columns=["Channel_Name","video_title","like_count"]))
 
-    elif question == '6.channel name of highest liked video':
-        query6 = '''select Channel_Name, video_title, like_count from videos where like_count is not null order 
-        by like_count desc limit 1 ;'''
-        cursor.execute(query6)
-        t6=cursor.fetchall()
-        st.write(pd.DataFrame(t6, columns=["Channel_Name","video_title","like_count"]))
+elif question == '6.channel name of highest liked video':
+    query6 = '''select Channel_Name, video_title, like_count from videos where like_count is not null order 
+    by like_count desc limit 1 ;'''
+    cursor.execute(query6)
+    t6=cursor.fetchall()
+    st.write(pd.DataFrame(t6, columns=["Channel_Name","video_title","like_count"]))
 
-    elif question == '7.Names of all the videos and their corresponding channels':
-        query7 = '''select Channel_Name, video_title from videos;'''
-        print("Executing query:", query7)
-        cursor.execute(query7)
-        t7=cursor.fetchall()
-        st.write(pd.DataFrame(t7, columns=["Channel_Name","video_title"]))
+elif question == '7.Names of all the videos and their corresponding channels':
+    query7 = '''select Channel_Name, video_title from videos;'''
+    print("Executing query:", query7)
+    cursor.execute(query7)
+    t7=cursor.fetchall()
+    st.write(pd.DataFrame(t7, columns=["Channel_Name","video_title"]))
 
 
-    elif question == '8.Videos with likes and their corresponding channel names':
-        query8 = '''select Channel_Name, video_title, like_count from videos where like_count is not null order by 
-        like_count desc;''' 
-        cursor.execute(query8)
-        t8=cursor.fetchall()
-        st.write(pd.DataFrame(t8, columns=["Channel_Name", "video_title", "like_count"]))
+elif question == '8.Videos with likes and their corresponding channel names':
+    query8 = '''select Channel_Name, video_title, like_count from videos where like_count is not null order by 
+    like_count desc;''' 
+    cursor.execute(query8)
+    t8=cursor.fetchall()
+    st.write(pd.DataFrame(t8, columns=["Channel_Name", "video_title", "like_count"]))
 
-    elif question == '9.Average duration of all videos in each channel':
-        query9 = '''select Channel_Name,avg(duration)from videos group by Channel_Name;'''
-        cursor.execute(query9)
-        t9=cursor.fetchall()
-        st.write(pd.DataFrame(t9, columns=["Channel_Name","duration"]))
+elif question == '9.Average duration of all videos in each channel':
+    query9 = '''select Channel_Name,avg(duration)from videos group by Channel_Name;'''
+    cursor.execute(query9)
+    t9=cursor.fetchall()
+    st.write(pd.DataFrame(t9, columns=["Channel_Name","duration"]))
 
-    elif question == '10.Number of views of each channel':
-        query10 = '''select Channel_Name, video_title , view_count from videos where view_count is not null;'''
-        cursor.execute(query10)
-        t10=cursor.fetchall()
-        st.write(pd.DataFrame(t10, columns=["Channel_Name","video_title","view_count"]))
-        st.balloons()
+elif question == '10.Number of views of each channel':
+    query10 = '''select Channel_Name, video_title , view_count from videos where view_count is not null;'''
+    cursor.execute(query10)
+    t10=cursor.fetchall()
+    st.write(pd.DataFrame(t10, columns=["Channel_Name","video_title","view_count"]))
+    st.balloons()
 
 
             
